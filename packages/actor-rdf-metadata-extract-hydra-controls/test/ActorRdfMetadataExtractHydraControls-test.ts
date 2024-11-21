@@ -235,6 +235,20 @@ describe('ActorRdfMetadataExtractHydraControls', () => {
       });
     });
 
+    it('should ignore invalid URLs in hydra properties', () => {
+      const hydraProperties = {
+        next: {
+          'not-a-url': [ 'noMatch1' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage/', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [],
+        previous: [],
+      });
+    });
+
     it('should get no search forms for empty hydra properties', () => {
       const hydraProperties = {};
       expect(actor.getSearchForms(hydraProperties)).toEqual({ values: []});

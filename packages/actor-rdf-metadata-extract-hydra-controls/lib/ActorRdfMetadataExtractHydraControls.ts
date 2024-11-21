@@ -84,7 +84,13 @@ export class ActorRdfMetadataExtractHydraControls extends ActorRdfMetadataExtrac
       // Perform a loose match to find the first suitable candidate.
       const pageUrlObj = new URL(pageUrl);
       if (pageUrlObj.protocol === 'http:' || pageUrlObj.protocol === 'https:') {
-        const fallbackTargets = Object.entries(links).find(([ s, _o ]) => urlLooseMatch(pageUrlObj, new URL(s)))?.[1];
+        const fallbackTargets = Object.entries(links).find(([ s, _o ]) => {
+          try {
+            return urlLooseMatch(pageUrlObj, new URL(s));
+          } catch {
+            return false;
+          }
+        })?.[1];
         if (fallbackTargets && fallbackTargets.length > 0) {
           return [ link, [ fallbackTargets[0] ]];
         }
