@@ -34,11 +34,62 @@ export class ActorRdfMetadataExtractHydraControls extends ActorRdfMetadataExtrac
    */
   public getLinks(pageUrl: string, hydraProperties: Record<string, Record<string, string[]>>):
   Record<string, any> {
+    function pathLooseMatch(x: string, y: string): boolean {
+      if (x === y) {
+        return true;
+      }
+      if (!x.endsWith('/')) {
+        return `${x}/` === y;
+      }
+      if (!y.endsWith('/')) {
+        return x === `${y}/`;
+      }
+      return false;
+    }
+    function hashLooseMatch(x: string, y: string): boolean {
+      return (x || '#') === (y || '#');
+    }
+    function urlLooseMatch(x: URL, y: URL): boolean {
+      if (
+        x.origin !== y.origin ||
+        !pathLooseMatch(x.pathname, y.pathname) ||
+        !hashLooseMatch(x.hash, y.hash) ||
+        x.searchParams.size !== y.searchParams.size
+      ) {
+        return false;
+      }
+      for (const k of x.searchParams.keys()) {
+        const xVals = x.searchParams.getAll(k);
+        const yVals = y.searchParams.getAll(k);
+        if (xVals.length !== yVals.length) {
+          return false;
+        }
+        if (xVals.findIndex((v, i) => v !== yVals[i]) >= 0) {
+          return false;
+        }
+      }
+      return true;
+    }
     return Object.fromEntries(ActorRdfMetadataExtractHydraControls.LINK_TYPES.map((link) => {
-      // First check the correct hydra:next, then the deprecated hydra:nextPage
+      // First check hydra:next (current standard), then fallback to the deprecated hydra:nextPage
       const links = hydraProperties[link] || hydraProperties[`${link}Page`];
-      const linkTargets = links && links[pageUrl];
-      return [ link, linkTargets && linkTargets.length > 0 ? [ linkTargets[0] ] : [] ];
+      if (!links) {
+        return [ link, []];
+      }
+      const linkTargets = links[pageUrl];
+      if (linkTargets && linkTargets.length > 0) {
+        return [ link, [ linkTargets[0] ]];
+      }
+      // The subject of links may not exactly match the pageUrl.
+      // Perform a loose match to find the first suitable candidate.
+      const pageUrlObj = new URL(pageUrl);
+      if (pageUrlObj.protocol === 'http:' || pageUrlObj.protocol === 'https:') {
+        const fallbackTargets = Object.entries(links).find(([ s, _o ]) => urlLooseMatch(pageUrlObj, new URL(s)))?.[1];
+        if (fallbackTargets && fallbackTargets.length > 0) {
+          return [ link, [ fallbackTargets[0] ]];
+        }
+      }
+      return [ link, []];
     }));
   }
 

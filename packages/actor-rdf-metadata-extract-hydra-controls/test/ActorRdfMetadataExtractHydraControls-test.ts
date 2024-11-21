@@ -70,6 +70,171 @@ describe('ActorRdfMetadataExtractHydraControls', () => {
       });
     });
 
+    it('should perform loose matching for fallback links', () => {
+      const hydraProperties = {
+        firstPage: {
+          'http://example.org/myPage': [ 'fallbackFirst1' ],
+        },
+        lastPage: {
+          'http://example.org/myPage': [ 'fallbackLast1' ],
+        },
+        nextPage: {
+          'http://example.org/myPage': [ 'fallbackNext1' ],
+        },
+        previousPage: {
+          'http://example.org/myPage': [ 'fallbackPrevious1' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage', hydraProperties)).toEqual({
+        first: [ 'fallbackFirst1' ],
+        last: [ 'fallbackLast1' ],
+        next: [ 'fallbackNext1' ],
+        previous: [ 'fallbackPrevious1' ],
+      });
+    });
+
+    it('should ignore non-http/https protocols for loose matching', () => {
+      const hydraProperties = {
+        next: {
+          'ftp://example.org/myPage?': [ 'fallbackNext1' ],
+        },
+      };
+      expect(actor.getLinks('ftp://example.org/myPage', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [],
+        previous: [],
+      });
+    });
+
+    it('should prioritize exact matches over fallback matches', () => {
+      const hydraProperties = {
+        next: {
+          'http://example.org/myPage#': [ 'fallbackNext1' ],
+          'http://example.org/myPage': [ 'exactNext1' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [ 'exactNext1' ],
+        previous: [],
+      });
+    });
+
+    it('should return no links when no suitable matches are found', () => {
+      const hydraProperties = {
+        next: {
+          'http://example.org/anotherPage': [ 'noMatch1' ],
+          'http://example.org/anotherPage/': [ 'noMatch2' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [],
+        previous: [],
+      });
+      expect(actor.getLinks('http://example.org/myPage/', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [],
+        previous: [],
+      });
+    });
+
+    it('should match URLs with differing query parameter orders', () => {
+      const hydraProperties = {
+        first: {
+          'http://example.org/myPage?a=1&b=2&c=3': [ 'first1' ],
+        },
+        last: {
+          'http://example.org/myPage?b=2&c=3&a=1': [ 'last1' ],
+        },
+        next: {
+          'http://example.org/myPage?c=3&b=2&a=1': [ 'next1' ],
+        },
+        previous: {
+          'http://example.org/myPage?b=2&a=1&c=3': [ 'prev1' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage?a=1&b=2&c=3', hydraProperties)).toEqual({
+        first: [ 'first1' ],
+        last: [ 'last1' ],
+        next: [ 'next1' ],
+        previous: [ 'prev1' ],
+      });
+    });
+
+    it('should not match URLs with different query parameters', () => {
+      const hydraProperties = {
+        first: {
+          'http://example.org/myPage?a=1&b=2&c=0': [ 'first1' ],
+        },
+        last: {
+          'http://example.org/myPage?b=2&c=3&a=1&b=2': [ 'last1' ],
+        },
+        next: {
+          'http://example.org/myPage?c=3&a=1&a=2': [ 'next1' ],
+        },
+        previous: {
+          'http://example.org/myPage?b=2&a=1': [ 'prev1' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage?a=1&b=2&c=3', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [],
+        previous: [],
+      });
+    });
+
+    it('should match URLs with trailing symbols loosely', () => {
+      const hydraProperties = {
+        first: {
+          'http://example.org/myPage#': [ 'first1' ],
+        },
+        next: {
+          'http://example.org/myPage/': [ 'next1' ],
+        },
+        previous: {
+          'http://example.org/myPage?': [ 'prev1' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage', hydraProperties)).toEqual({
+        first: [ 'first1' ],
+        last: [],
+        next: [ 'next1' ],
+        previous: [ 'prev1' ],
+      });
+    });
+
+    it('should match URLs without trailing symbols loosely', () => {
+      const hydraProperties = {
+        next: {
+          'http://example.org/myPage': [ 'next1' ],
+        },
+      };
+      expect(actor.getLinks('http://example.org/myPage/', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [ 'next1' ],
+        previous: [],
+      });
+      expect(actor.getLinks('http://example.org/myPage#', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [ 'next1' ],
+        previous: [],
+      });
+      expect(actor.getLinks('http://example.org/myPage?', hydraProperties)).toEqual({
+        first: [],
+        last: [],
+        next: [ 'next1' ],
+        previous: [],
+      });
+    });
+
     it('should get no search forms for empty hydra properties', () => {
       const hydraProperties = {};
       expect(actor.getSearchForms(hydraProperties)).toEqual({ values: []});
